@@ -1,0 +1,68 @@
+package org.java;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
+import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelRequest;
+import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelResponse;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class SenteceBert {
+
+    public static float[] createEmbeddingsWithSentenceBert() throws IOException, InterruptedException
+    {
+        HttpClient client = HttpClient.newHttpClient();
+        ObjectMapper mapper = new ObjectMapper();
+
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("sentences", List.of("This is an example.", "This is another sentence."));
+        String requestBody = mapper.writeValueAsString(requestMap);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:5000/embed"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        Map<String, Object> responseMap = mapper.readValue(response.body(), Map.class);
+
+        System.out.println("Embeddings: " + responseMap.get("embeddings"));
+
+        return convertMapToFloatArray(responseMap);
+    }
+
+    private static float[] convertMapToFloatArray(Map<String, Object> map) {
+        float[] result = new float[5];//[map.size()];
+        int i = 0;
+
+        for (Object value : map.values()) {
+            try {
+                if (value instanceof Number) {
+                    result[i] = ((Number) value).floatValue();
+                } else if (value instanceof String) {
+                    result[i] = Float.parseFloat((String) value);
+                } else {
+                    throw new IllegalArgumentException("Valor no convertible a float: " + value);
+                }
+                i++;
+            } catch (Exception e) {
+                System.err.println("Error al convertir el valor: " + value + " - " + e.getMessage());
+                result[i++] = 0.0f; // Opcional: valor por defecto en caso de error
+            }
+        }
+
+        return result;
+    }
+}
